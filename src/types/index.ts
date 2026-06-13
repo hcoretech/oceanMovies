@@ -19,6 +19,8 @@ export interface MockMovie {
   category: string;
   rating: number;
   image: string;
+  overview?: string; 
+  isFeatured?: boolean; 
 }
 
 export type DashboardTab = 'home' | 'discover' | 'bookmarks';
