@@ -137,11 +137,6 @@ export default function App() {
             </div>
           </div>
 
-          <div className="flex items-center gap-4 shrink-0">
-            <span className="text-xs bg-slate-900 border border-slate-800 px-3 py-1 rounded-full font-medium text-slate-500">
-              Database: <span className="text-cyan-400 font-bold">Online</span>
-            </span>
-          </div>
         </header>
 
         <main className="flex-1 p-4 md:p-8 max-w-7xl w-full mx-auto space-y-8">
