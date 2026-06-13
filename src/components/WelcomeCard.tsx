@@ -1,5 +1,5 @@
 import React from 'react';
-import { MockMovie } from '../types';
+import { type MockMovie } from '../types';
 
 interface WelcomeCardProps {
   movie: MockMovie;
