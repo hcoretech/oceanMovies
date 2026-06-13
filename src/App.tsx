@@ -1,163 +1,135 @@
-import { useState, useMemo } from 'react';
-import { type DashboardTab, type MockMovie } from "./types/index";
-import { WelcomeCard } from './components/welcomeCard';
+import { useState, useMemo, useEffect } from 'react';
+import { type DashboardTab, type TMDBMovie, type SavedItem } from "./types/index";
+import { FILTER_CATEGORIES } from './components/data/staticData';
+import { WelcomeCard } from './components/WelcomeCard'; 
 import { MovieCarousel } from "./components/MovieCarousel";
-
-const FEATURED_ITEMS: MockMovie[] = [
-  { 
-    id: 1, 
-    title: "The Cinematic Ocean Expedition", 
-    category: "Documentary", 
-    rating: 8.9, 
-    image: "https://unsplash.com",
-    overview: "An immersive deep-sea journey mapping untouched aquatic eco-systems and majestic oceanic life across uncharted waters.",
-    isFeatured: true 
-  },
-  { 
-    id: 2, 
-    title: "Deep Sea Anomalies", 
-    category: "Sci-Fi Thriller", 
-    rating: 7.4, 
-    image: "https://unsplash.com",
-    overview: "When a deep-trench research facility intercepts a rhythmic subsonic signature, the crew discovers they aren't alone.",
-    isFeatured: true 
-  },
-  { 
-    id: 3, 
-    title: "Coral Reef Guardians", 
-    category: "Nature Story", 
-    rating: 9.1, 
-    image: "https://unsplash.com",
-    overview: "Following local coastal conservationists battling environmental tides to restore global life networks.",
-    isFeatured: true 
-  },
-  { 
-    id: 4, 
-    title: "Midnight Midnight Tides", 
-    category: "Action Drama", 
-    rating: 6.8, 
-    image: "https://unsplash.com" 
-  },
-];
-
-// Dynamically extract categories to populate our filter buttons automatically
-const FILTER_CATEGORIES = ["All", "Documentary", "Sci-Fi Thriller", "Nature Story", "Action Drama"];
+import { DiscoverCard } from "./components/DiscoverCard";
+import { Sidebar } from "./components/Sidebar";
+import { Header } from "./components/Header";
+import { getTrendingMovies, searchDatabaseMovies } from "./services/movieApi";
+import { MovieDetailsModal } from "./components/MovieDetailsModal";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<DashboardTab>('home');
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
-  
-  // Search & Category Filter States
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [selectedMovie, setSelectedMovie] = useState<TMDBMovie | null>(null);
+  
 
-  // Filter Carousel items from master data set
-  const carouselMovies = useMemo(() => FEATURED_ITEMS.filter(m => m.isFeatured), []);
+  const [selectedCategory, setSelectedCategory] = useState<string>('All Movies');
 
-  // Compute Search + Category Filtering Rules dynamically
+  const [bookmarks, setBookmarks] = useState<SavedItem[]>(() => {
+    const saved = localStorage.getItem('oceanmovies_secure_store');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [homeMovies, setHomeMovies] = useState<TMDBMovie[]>([]);
+  const [liveMovies, setLiveMovies] = useState<TMDBMovie[]>([]);
+  
+  const [apiSearchQuery, setApiSearchQuery] = useState<string>('');
+  const [apiLoading, setApiLoading] = useState<boolean>(false);
+
+  useEffect(() => {
+    localStorage.setItem('oceanmovies_secure_store', JSON.stringify(bookmarks));
+  }, [bookmarks]);
+
+
+  useEffect(() => {
+    async function initHomeFeed() {
+      try {
+        setApiLoading(true);
+        const results = await getTrendingMovies();
+        setHomeMovies(results);
+      } catch (err) {
+        console.error("Home pipeline sync error:", err);
+      } finally {
+        setApiLoading(false);
+      }
+    }
+    initHomeFeed();
+  }, []);
+
+
+  const carouselMovies = useMemo(() => homeMovies.slice(0, 3), [homeMovies]);
+
   const filteredMovies = useMemo(() => {
-    return FEATURED_ITEMS.filter(movie => {
-      const matchesSearch = movie.title.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesCategory = selectedCategory === 'All' || movie.category === selectedCategory;
+    return homeMovies.filter(movie => {
+      const matchesSearch = (movie.title || '').toLowerCase().includes(searchQuery.toLowerCase());
+      
+      let matchesCategory = true;
+      if (selectedCategory === "Highly Rated (★7.5+)") matchesCategory = movie.vote_average >= 7.5;
+      if (selectedCategory === "Blockbuster Popular (★6.5+)") matchesCategory = movie.vote_average >= 6.5;
+
       return matchesSearch && matchesCategory;
     });
-  }, [searchQuery, selectedCategory]);
+  }, [homeMovies, searchQuery, selectedCategory]);
+
+  useEffect(() => {
+    if (activeTab !== 'discover') return;
+    async function loadLiveFeed() {
+      setApiLoading(true);
+      try {
+        const results = apiSearchQuery.trim() ? await searchDatabaseMovies(apiSearchQuery) : await getTrendingMovies();
+        setLiveMovies(results);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setApiLoading(false);
+      }
+    }
+    const delayDebounce = setTimeout(() => loadLiveFeed(), 400);
+    return () => clearTimeout(delayDebounce);
+  }, [apiSearchQuery, activeTab]);
+
+  const toggleAPIMovie = (movie: TMDBMovie) => {
+    const itemKey = movie.id;
+    setBookmarks(prev => {
+      if (prev.some(b => b.id === itemKey)) return prev.filter(b => b.id !== itemKey);
+      
+      const cleanPath = movie.poster_path 
+      
+      return [...prev, {
+        id: movie.id,
+        title: movie.title || 'Untitled Content',
+        rating: movie.vote_average || 0.0,
+        image: cleanPath ? `https://image.tmdb.org/t/p/original${cleanPath}` : 'https://unsplash.com',
+        overview: movie.overview || "No plot summary provided.",
+        releaseYear: movie.release_date ? movie.release_date.split('-')[0] : 'N/A'
+      }];
+    });
+  };
 
   return (
     <div className="flex min-h-screen bg-slate-950 text-slate-100 font-sans">
-      
-      <aside className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-slate-900 bg-slate-950/80 backdrop-blur-xl transition-transform duration-300 md:static ${
-        sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0 md:flex'
-      }`}>
-        <div className="flex h-16 items-center gap-3 px-6 border-b border-slate-900/80">
-          <span className="text-base font-black uppercase tracking-wider bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
-            OceanMovies
-          </span>
-        </div>
 
-        <nav className="flex-1 space-y-1 px-4 py-6">
-          <button
-            onClick={() => setActiveTab('home')}
-            className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all ${
-              activeTab === 'home' ? 'bg-gradient-to-r from-cyan-500/10 to-blue-500/10 text-cyan-400 border border-cyan-500/10' : 'text-slate-400 hover:bg-slate-900/50 hover:text-slate-200 border border-transparent'
-            }`}
-          >
-            <span className="text-base">🏠</span> Home
-          </button>
-          <button
-            onClick={() => setActiveTab('discover')}
-            className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all ${
-              activeTab === 'discover' ? 'bg-gradient-to-r from-cyan-500/10 to-blue-500/10 text-cyan-400 border border-cyan-500/10' : 'text-slate-400 hover:bg-slate-900/50 hover:text-slate-200 border border-transparent'
-            }`}
-          >
-            <span className="text-base">🧭</span> Discover
-          </button>
-          <button
-            onClick={() => setActiveTab('bookmarks')}
-            className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all ${
-              activeTab === 'bookmarks' ? 'bg-gradient-to-r from-cyan-500/10 to-blue-500/10 text-cyan-400 border border-cyan-500/10' : 'text-slate-400 hover:bg-slate-900/50 hover:text-slate-200 border border-transparent'
-            }`}
-          >
-            <span className="text-base">🔖</span> Downloads
-          </button>
-        </nav>
-      </aside>
-
+   <Sidebar 
+      sidebarOpen={sidebarOpen} 
+      setSidebarOpen={setSidebarOpen}
+       activeTab={activeTab} 
+       setActiveTab={setActiveTab} 
+      bookmarkCount={bookmarks.length} 
+      />
 
       <div className="flex flex-1 flex-col overflow-x-hidden">
-        
-
-        <header className="flex h-16 items-center justify-between border-b border-slate-900/80 px-4 md:px-8 bg-slate-950/40 backdrop-blur-md sticky top-0 z-40 gap-4">
-          <div className="flex items-center gap-4 flex-1">
-            <button 
-              onClick={() => setSidebarOpen(!sidebarOpen)} 
-              className="rounded-xl border border-slate-900 p-2 text-slate-400 hover:bg-slate-900 hover:text-slate-100 transition-colors"
-            >
-              ☰
-            </button>
-
-
-            <div className="relative w-full max-w-md">
-              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs">🔍</span>
-              <input 
-                type="text"
-                placeholder="Search movies instantly..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-full border border-slate-900 bg-slate-900/40 py-1.5 pl-10 pr-4 text-xs outline-none transition-all placeholder:text-slate-500 focus:border-cyan-500/40 focus:ring-4 focus:ring-cyan-500/5"
-              />
-              {searchQuery && (
-                <button 
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[10px] bg-slate-800 rounded-full px-1 hover:text-white"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-          </div>
-
-        </header>
+        <Header activeTab={activeTab} setSidebarOpen={setSidebarOpen} searchQuery={searchQuery} setSearchQuery={setSearchQuery} apiSearchQuery={apiSearchQuery} setApiSearchQuery={setApiSearchQuery} />
 
         <main className="flex-1 p-4 md:p-8 max-w-7xl w-full mx-auto space-y-8">
-          {activeTab === 'home' && (
+          {apiLoading &&
+           <div className="text-center text-xs text-cyan-400 py-12 animate-pulse">Getting datas...</div>}
+
+          {!apiLoading && activeTab === 'home' && (
             <>
-              {!searchQuery && selectedCategory === 'All' && (
-                <MovieCarousel 
-                  movies={carouselMovies} 
-                  onExplore={() => setActiveTab('discover')} 
-                />
+              {!searchQuery && selectedCategory === 'All Movies' && (
+                <MovieCarousel movies={carouselMovies} onSelectMovie={(movie) => setSelectedMovie(movie)} />
               )}
 
               <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-                {FILTER_CATEGORIES.map((category) => (
-                  <button
-                    key={category}
-                    onClick={() => setSelectedCategory(category)}
+                {FILTER_CATEGORIES.map(category => (
+                  <button 
+                    key={category} 
+                    onClick={() => setSelectedCategory(category)} 
                     className={`shrink-0 rounded-full px-4 py-1.5 text-xs font-semibold border transition-all ${
-                      selectedCategory === category 
-                        ? 'bg-slate-100 text-slate-950 border-slate-100 shadow-md' 
-                        : 'bg-slate-900/40 text-slate-400 border-slate-900 hover:border-slate-800 hover:text-slate-200'
+                      selectedCategory === category ? 'bg-slate-100 text-slate-950 border-slate-100 shadow-sm' : 'bg-slate-900/40 text-slate-400 border-slate-900 hover:border-slate-800 hover:text-slate-200'
                     }`}
                   >
                     {category}
@@ -166,15 +138,7 @@ export default function App() {
               </div>
 
               <section>
-                <div className="flex items-center justify-between mb-5">
-                  <h3 className="text-xs font-black uppercase tracking-widest text-slate-500">
-                    {searchQuery || selectedCategory !== 'All' ? 'Filtered Catalog Results' : 'Top Rated Movies'}
-                  </h3>
-                  <span className="text-[11px] font-bold text-slate-500">
-                    Matches: <span className="text-cyan-400">{filteredMovies.length}</span>
-                  </span>
-                </div>
-
+                <h3 className="text-xs font-black uppercase tracking-widest text-slate-500 mb-5"> Trending Movies</h3>
                 {filteredMovies.length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-slate-900 py-12 text-center text-slate-500 text-xs">
                     No movies match your active search filter sequence.
@@ -182,7 +146,28 @@ export default function App() {
                 ) : (
                   <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
                     {filteredMovies.map(movie => (
-                      <WelcomeCard key={movie.id} movie={movie} />
+
+                      <div 
+                        key={movie.id} 
+                        className="relative group cursor-pointer"
+                        onClick={() => setSelectedMovie(movie)}
+                      >
+                        <WelcomeCard movie={movie} />
+                        <button 
+
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            toggleAPIMovie(movie); 
+                          }} 
+                          className={`absolute top-4 right-4 z-20 rounded-xl px-2.5 py-1 text-[10px] font-bold border transition-all shadow-md ${
+                            bookmarks.some(b => b.id === movie.id) 
+                              ? 'bg-cyan-500 text-slate-950 border-cyan-400' 
+                              : 'bg-slate-950/80 text-slate-300 border-slate-800 hover:bg-slate-900'
+                          }`}
+                        >
+                          {bookmarks.some(b => b.id === movie.id) ? '✓ Saved' : '+ Download'}
+                        </button>
+                      </div>
                     ))}
                   </div>
                 )}
@@ -190,26 +175,84 @@ export default function App() {
             </>
           )}
 
-          {activeTab === 'discover' && (
-            <div className="rounded-2xl border border-dashed border-slate-800 py-16 text-center text-slate-500">
-              <span className="text-2xl block mb-2">🧭</span>
-              <p className="text-sm font-medium">Discovery</p>
-              <p className="text-xs text-slate-600 mt-1">dicover movies</p>
-            </div>
 
+          {!apiLoading && activeTab === 'discover' && (
+            <div className="space-y-6">
+              <h3 className="text-base font-bold text-white">All</h3>
+              {liveMovies.length === 0 ? <div className="rounded-2xl border border-dashed border-slate-900 py-16 text-center text-slate-500"><p className="text-xs text-slate-600">No Data Stream Resolved</p></div> : (
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+                  {liveMovies.map(movie => (
+                     <div key={movie.id} className="relative group cursor-pointer" onClick={() => setSelectedMovie(movie)}>
+                      <DiscoverCard movie={movie} />
+                      <button onClick={(e) => { e.stopPropagation(); toggleAPIMovie(movie); }} 
+                      className={`absolute top-4 right-4 z-20 rounded-xl px-2.5 py-1 text-[10px] font-bold border transition-all shadow-md ${bookmarks.some(b => b.id === movie.id) ? 'bg-cyan-500 text-slate-950 border-cyan-400' : 'bg-slate-950/80 text-slate-300 border-slate-800 hover:bg-slate-900 hover:text-white'}`}>{bookmarks.some(b => b.id === movie.id) ? '✓ Saved' : '+ Download'}</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
 
-          {activeTab === 'bookmarks' && (
-            <div className="rounded-2xl border border-dashed border-slate-800 py-16 text-center text-slate-500">
-              <span className="text-2xl block mb-2">🔖</span>
-              <p className="text-sm font-medium">Saved movies</p>
-              <p className="text-xs text-slate-600 mt-1">empty </p>
+
+          {!apiLoading && activeTab === 'bookmarks' && (
+            <div className="space-y-6">
+              <h3 className="text-base font-bold text-white">Your Saved Downloads</h3>
+              {bookmarks.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-900 py-16 text-center text-slate-500">
+                  <p className="text-xs text-slate-600">Your downloads library is empty.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 animate-fadeIn">
+                  {bookmarks.map(movie => {
+
+                    const normalizedMovie: TMDBMovie = {
+                      id: movie.id,
+                      title: movie.title,
+                      vote_average: movie.rating,
+                      poster_path: movie.image.includes('/w500') || movie.image.includes('/original') 
+                        ? movie.image.substring(movie.image.lastIndexOf('/')) 
+                        : null,
+                      backdrop_path: null,
+                      overview: movie.overview,
+                      release_date: movie.releaseYear !== 'Premium Static' ? `${movie.releaseYear}-01-01` : ''
+                    };
+
+                    return (
+                      <div 
+                        key={movie.id} 
+                        className="relative group cursor-pointer"
+                        onClick={() => setSelectedMovie(normalizedMovie)}
+                      >
+                        <WelcomeCard movie={movie} />
+                        <button 
+
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            setBookmarks(prev => prev.filter(b => b.id !== movie.id)); 
+                          }} 
+                          className="absolute top-4 right-4 z-20 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 px-2.5 py-1 text-[10px] font-bold hover:bg-red-500 hover:text-white transition-all shadow-md"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
+
+           {selectedMovie && (
+             <MovieDetailsModal 
+             movie={selectedMovie} 
+             onClose={() => setSelectedMovie(null)} 
+             onToggleDownload={toggleAPIMovie}
+             isSaved={bookmarks.some(b => b.id === selectedMovie.id)}
+             />
+             )}
         </main>
+       
       </div>
     </div>
-  );
-}
-
-
+  )}
+  ;
