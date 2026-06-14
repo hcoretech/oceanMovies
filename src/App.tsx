@@ -11,7 +11,7 @@ import { MovieDetailsModal } from "./components/MovieDetailsModal";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<DashboardTab>('home');
-  const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedMovie, setSelectedMovie] = useState<TMDBMovie | null>(null);
   
