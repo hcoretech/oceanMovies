@@ -65,7 +65,7 @@ npm install
 ### 2. Initialize Variables Configuration
 Create an environment settings configuration file named exactly `.env.local` inside the main root folder segment (next to `package.json`):
 ```env
-TMDB_API_KEY="GET tmdb api key"
+VITE_TMDB_API_KEY="GET tmdb api key"
 ```
 
 ### 3. Spin Up Development Workspaces

@@ -3,9 +3,7 @@ import { type TMDBMovie } from '../types';
 
 const BASE_URL = 'https://api.themoviedb.org/3';
 
-const API_KEY = '797d5e2af7064af82906045ba225fd27';
-
-
+const API_KEY  = import.meta.env.VITE_TMDB_API_KEY
 const tmdbClient = axios.create({
   baseURL: BASE_URL,
   params: {
