@@ -50,7 +50,7 @@ export default function App() {
   }, []);
 
 
-  const carouselMovies = useMemo(() => homeMovies.slice(0, 3), [homeMovies]);
+  const carouselMovies = useMemo(() => homeMovies.slice(0, 6), [homeMovies]);
 
   const filteredMovies = useMemo(() => {
     return homeMovies.filter(movie => {
@@ -111,7 +111,12 @@ export default function App() {
       />
 
       <div className="flex flex-1 flex-col overflow-x-hidden">
-        <Header activeTab={activeTab} setSidebarOpen={setSidebarOpen} searchQuery={searchQuery} setSearchQuery={setSearchQuery} apiSearchQuery={apiSearchQuery} setApiSearchQuery={setApiSearchQuery} />
+        <Header activeTab={activeTab}
+         setSidebarOpen={setSidebarOpen} 
+         searchQuery={searchQuery} 
+         setSearchQuery={setSearchQuery} 
+         apiSearchQuery={apiSearchQuery} 
+         setApiSearchQuery={setApiSearchQuery} />
 
         <main className="flex-1 p-4 md:p-8 max-w-7xl w-full mx-auto space-y-8">
           {apiLoading &&

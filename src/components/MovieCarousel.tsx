@@ -10,7 +10,7 @@ export const MovieCarousel: React.FC<MovieCarouselProps> = ({ movies, onSelectMo
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [imageLoading, setImageLoading] = useState<boolean>(true);
 
-  // Reset the pulse overlay container loader flag whenever the slides shift index positions
+
   useEffect(() => {
     setImageLoading(true);
   }, [currentIndex]);
@@ -56,7 +56,7 @@ export const MovieCarousel: React.FC<MovieCarouselProps> = ({ movies, onSelectMo
         <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/40 to-transparent z-10"></div>
       </div>
 
-      {/* Slide Content */}
+
       <div className="relative z-30 flex h-full flex-col justify-end p-6 md:p-10 max-w-xl">
         <span className="inline-block rounded-md bg-cyan-500/20 px-2.5 py-0.5 text-xs font-bold uppercase tracking-widest text-cyan-400 w-max">
           {displayRating}

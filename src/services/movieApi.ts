@@ -15,7 +15,6 @@ const tmdbClient = axios.create({
 
 export async function getTrendingMovies(): Promise<TMDBMovie[]> {
   try {
-    // Axios automatically unpacks the JSON payload into the .data object
     const response = await tmdbClient.get('/trending/movie/day');
     return response.data.results || [];
   } catch (err) {
